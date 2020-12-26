@@ -1,42 +1,18 @@
 #!/Users/kalle/venv/kattisscraping/bin/python
 
 import sys
+import shelve
 import time
 import requests
 from bs4 import BeautifulSoup
+
+from models import Problem
 
 KATTIS_SERVER = 'https://open.kattis.com'
 PROBLEM_LIST_PATH = '/problems'
 REQUEST_HEADERS = {
     'User-Agent': 'KattisArchiveBot/0.0 (kalle@scharlund.se)',
 }
-
-
-class Problem:
-    def __init__(self,
-                 problem_id,
-                 problem_name,
-                 total_submissions,
-                 accepted_submissions,
-                 submissions_ratio,
-                 fastest_submission,
-                 total_users,
-                 accepted_users,
-                 users_ratio,
-                 difficulty):
-        self.problem_id = problem_id
-        self.problem_name = problem_name
-        self.total_submissions = total_submissions
-        self.accepted_submissions = accepted_submissions
-        self.submissions_ratio = submissions_ratio
-        self.fastest_submission = fastest_submission
-        self.total_users = total_users
-        self.accepted_users = accepted_users
-        self.users_ratio = users_ratio
-        self.difficulty = difficulty
-
-    def __str__(self):
-        return ' '.join((self.problem_id, self.problem_name))
 
 
 def fetch_problem_pages():
@@ -55,14 +31,33 @@ def fetch_problem_pages():
 
 def parse_title_cell(cell):
     if 'name_column' not in cell['class']:
-        raise ValueError('Expected a name column first. Has the format changed?')
+        raise ValueError(
+            'Expected a name column first. Has the format changed?'
+        )
     link = cell.a['href']
     link_elements = link.split('/')
     if len(link_elements) != 3 or link_elements[0] or link_elements[1] != 'problems':
         raise ValueError('Unexpected problem link format ' + link)
-    problem_id = link_elements[-1]
-    problem_name = cell.string
+    problem_id = str(link_elements[-1])
+    problem_name = str(cell.string)
     return problem_id, problem_name
+
+
+def parse_difficulty_cell(cell):
+    if '-' in cell.string:
+        min_difficulty, max_difficulty = (
+            int(s.replace('.', '')) for s in cell.string.split(' - ')
+        )
+    else:
+        min_difficulty = max_difficulty = int(cell.string.replace('.', ''))
+    if any(
+        difficulty < 10 or difficulty > 99
+        for difficulty in (min_difficulty, max_difficulty)
+    ):
+        raise ValueError(
+            'Difficulty {} not between 1.0 and 9.9'.format(cell.string)
+        )
+    return min_difficulty, max_difficulty
 
 
 def parse_problem_page(page_soup):
@@ -74,26 +69,47 @@ def parse_problem_page(page_soup):
         problem_id, problem_name = parse_title_cell(cols[0])
         total_submissions = int(cols[1].string)
         accepted_submissions = int(cols[2].string)
-        submissions_ratio = int(cols[3].string.replace('%', '')) / 100
-        fastest_submission = float(cols[4].string)
+        submissions_ratio = (int(cols[3].string.replace('%', '')) / 100) if '--' not in cols[3].string else None
+        fastest_submission = float(cols[4].string) if '--' not in cols[4].string else None
         total_users = int(cols[5].string)
         accepted_users = int(cols[6].string)
-        users_ratio = int(cols[7].string.replace('%', '')) / 100
-        difficulty = int(cols[8].string.replace('.', ''))
-        if difficulty < 10 or difficulty > 99:
-            raise ValueError('Difficulty {} not between 1.0 and 9.9'.format(difficulty))
+        users_ratio = (int(cols[7].string.replace('%', '')) / 100) if '--' not in cols[3].string else None
+        min_difficulty, max_difficulty = parse_difficulty_cell(cols[8])
 
-        yield Problem(problem_id, problem_name, total_submissions, accepted_submissions, submissions_ratio, fastest_submission, total_users, accepted_users, users_ratio, difficulty)
+        yield Problem(
+            problem_id,
+            problem_name,
+            total_submissions,
+            accepted_submissions,
+            submissions_ratio,
+            fastest_submission,
+            total_users,
+            accepted_users,
+            users_ratio,
+            min_difficulty,
+            max_difficulty
+        )
 
 
 def main():
     '''
     Entry point for fetching problems.
     '''
-    for page_soup in fetch_problem_pages():
-        for problem in parse_problem_page(page_soup):
-            print(problem)
-        time.sleep(1)
+    with shelve.open('problem_db') as db:
+        if '-f' not in sys.argv and time.time() - db.get('_latest_fetch', 0) < 3600:
+            raise ValueError('Latest fetch less than an hour old, -f to override')
+        problems = {}
+        for page_soup in fetch_problem_pages():
+            for problem in parse_problem_page(page_soup):
+                print(problem)
+                problems[problem.problem_id] = problem
+            time.sleep(1)
+        db['problems'] = problems
+        db['_latest_fetch'] = time.time()
+        db['_by_diff_and_users'] = list(sorted(
+            ((p.problem_id, p.min_difficulty, p.total_users) for p in db['problems'].values()),
+            key=lambda x: (x[1], -x[2])
+        ))
 
 
 if __name__ == '__main__':
