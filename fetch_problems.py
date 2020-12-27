@@ -98,8 +98,9 @@ def main():
     '''
     verbose = '-v' in sys.argv
     with shelve.open('problem_db') as db:
-        if '-f' not in sys.argv and time.time() - db.get('_latest_fetch', 0) < 3600:
-            raise ValueError('Latest fetch less than an hour old, -f to override')
+        if '-f' not in sys.argv and time.time() - db.get('_latest_fetch', 0) < (3600 * 24):
+            print('Latest fetch less than 24 hours old, -f to override', file=sys.stderr)
+            return
         problems = {}
         for page_soup in fetch_problem_pages(verbose):
             for problem in parse_problem_page(page_soup):
