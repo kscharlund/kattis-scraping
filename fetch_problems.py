@@ -106,7 +106,7 @@ def main():
                 if verbose:
                     print(problem)
                 problems[problem.problem_id] = problem
-            time.sleep(1)
+            time.sleep(0.5)
         db['problems'] = problems
         db['_latest_fetch'] = time.time()
         db['_by_diff_and_users'] = list(sorted(
