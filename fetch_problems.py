@@ -109,10 +109,6 @@ def main():
             time.sleep(0.5)
         db['problems'] = problems
         db['_latest_fetch'] = time.time()
-        db['_by_diff_and_users'] = list(sorted(
-            ((p.problem_id, p.min_difficulty, p.total_users) for p in db['problems'].values()),
-            key=lambda x: (x[1], -x[2])
-        ))
 
 
 if __name__ == '__main__':

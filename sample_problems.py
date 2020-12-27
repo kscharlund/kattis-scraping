@@ -25,7 +25,12 @@ def diff_histogram(problems):
 
 
 def get_random_problem(
-    problems, min_difficulty, max_difficulty, min_user_ratio=0.2, min_users=50
+    problems,
+    previous_problems,
+    min_difficulty,
+    max_difficulty,
+    min_user_ratio=0.2,
+    min_users=50
 ):
     popularity_factor = 5
     suitable_problems = [
@@ -35,6 +40,7 @@ def get_random_problem(
             and problem.max_difficulty <= max_difficulty
             and problem.accepted_users >= min_users
             and problem.users_ratio and problem.users_ratio >= min_user_ratio
+            and problem.problem_id not in previous_problems
         )
     ]
     max_users = max(p.accepted_users for p in suitable_problems)
@@ -63,6 +69,7 @@ def main():
     with shelve.open('problem_db', 'r') as db:
         problems = db['problems']
         with shelve.open('selected_db', 'c') as selected:
+            previous_problems = selected.get('previous', {})
             today = str(date.today())
             if '-f' not in sys.argv and today in selected:
                 print('Using previously sampled problems, -f to override', file=sys.stderr)
@@ -71,10 +78,13 @@ def main():
                         print_problem(problem)
                         print()
                 return
-            s_problem = get_random_problem(problems, 00, 25)
-            m_problem = get_random_problem(problems, 25, 60)
-            l_problem = get_random_problem(problems, 60, 99)
+            s_problem = get_random_problem(problems, previous_problems, 00, 25)
+            m_problem = get_random_problem(problems, previous_problems, 25, 60)
+            l_problem = get_random_problem(problems, previous_problems, 60, 99)
             selected[today] = (s_problem, m_problem, l_problem)
+            for problem in selected[today]:
+                previous_problems.setdefault(problem.problem_id, []).append(today)
+            selected['previous'] = previous_problems
             if verbose:
                 for problem in selected[today]:
                     print_problem(problem)
