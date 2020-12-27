@@ -59,23 +59,26 @@ Difficulty: {diff}, solved by {problem.accepted_users}/{problem.total_users}''')
 
 
 def main():
+    verbose = '-v' in sys.argv
     with shelve.open('problem_db', 'r') as db:
         problems = db['problems']
         with shelve.open('selected_db', 'c') as selected:
             today = str(date.today())
             if '-f' not in sys.argv and today in selected:
-                print('Using previously sampled problems, -f to override\n')
-                for problem in selected[today]:
-                    print_problem(problem)
-                    print()
+                print('Using previously sampled problems, -f to override', file=sys.stderr)
+                if verbose:
+                    for problem in selected[today]:
+                        print_problem(problem)
+                        print()
                 return
             s_problem = get_random_problem(problems, 00, 25)
             m_problem = get_random_problem(problems, 25, 60)
             l_problem = get_random_problem(problems, 60, 99)
             selected[today] = (s_problem, m_problem, l_problem)
-            for problem in selected[today]:
-                print_problem(problem)
-                print()
+            if verbose:
+                for problem in selected[today]:
+                    print_problem(problem)
+                    print()
 
 
 if __name__ == '__main__':

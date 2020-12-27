@@ -15,10 +15,11 @@ REQUEST_HEADERS = {
 }
 
 
-def fetch_problem_pages():
+def fetch_problem_pages(verbose):
     page_path = PROBLEM_LIST_PATH
     while page_path:
-        print('Fetching', KATTIS_SERVER + page_path, file=sys.stderr)
+        if verbose:
+            print('Fetching', KATTIS_SERVER + page_path)
         req = requests.get(KATTIS_SERVER + page_path, headers=REQUEST_HEADERS)
         soup = BeautifulSoup(req.text, 'html.parser')
         next_link = soup.find(id='problem_list_next')
@@ -95,13 +96,15 @@ def main():
     '''
     Entry point for fetching problems.
     '''
+    verbose = '-v' in sys.argv
     with shelve.open('problem_db') as db:
         if '-f' not in sys.argv and time.time() - db.get('_latest_fetch', 0) < 3600:
             raise ValueError('Latest fetch less than an hour old, -f to override')
         problems = {}
-        for page_soup in fetch_problem_pages():
+        for page_soup in fetch_problem_pages(verbose):
             for problem in parse_problem_page(page_soup):
-                print(problem)
+                if verbose:
+                    print(problem)
                 problems[problem.problem_id] = problem
             time.sleep(1)
         db['problems'] = problems
