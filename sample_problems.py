@@ -78,9 +78,9 @@ def main():
                         print_problem(problem)
                         print()
                 return
-            s_problem = get_random_problem(problems, previous_problems, 00, 25)
-            m_problem = get_random_problem(problems, previous_problems, 25, 60)
-            l_problem = get_random_problem(problems, previous_problems, 60, 99)
+            s_problem = get_random_problem(problems, previous_problems, 00, 20)
+            m_problem = get_random_problem(problems, previous_problems, 20, 50)
+            l_problem = get_random_problem(problems, previous_problems, 50, 99)
             selected[today] = (s_problem, m_problem, l_problem)
             for problem in selected[today]:
                 previous_problems.setdefault(problem.problem_id, []).append(today)
